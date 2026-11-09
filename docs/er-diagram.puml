@@ -1,0 +1,60 @@
+@startuml
+!pragma layout smetana
+hide circle
+skinparam linetype ortho
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam entityBackgroundColor #F2F7FC
+skinparam entityBorderColor #284B63
+title Library Management - ER (6 tables, 3NF)
+
+entity authors {
+  * id : BIGINT <<PK>>
+  --
+  * name : VARCHAR(120) <<UK>>
+}
+entity categories {
+  * id : BIGINT <<PK>>
+  --
+  * name : VARCHAR(80) <<UK>>
+}
+entity books {
+  * id : BIGINT <<PK>>
+  --
+  * isbn : VARCHAR(13) <<UK>>
+  * title : VARCHAR(200)
+  * publication_year : INTEGER
+  * category_id : BIGINT <<FK>>
+  * total_copies : INTEGER
+}
+entity book_authors {
+  * book_id : BIGINT <<PK,FK>>
+  * author_id : BIGINT <<PK,FK>>
+}
+entity readers {
+  * id : BIGINT <<PK>>
+  --
+  * full_name : VARCHAR(120)
+  * email : VARCHAR(160) <<UK>>
+  * membership_type : VARCHAR(10)
+}
+entity loans {
+  * id : BIGINT <<PK>>
+  --
+  * book_id : BIGINT <<FK>>
+  * reader_id : BIGINT <<FK>>
+  * borrowed_on : DATE
+  * due_on : DATE
+  returned_on : DATE (nullable)
+}
+categories ||--o{ books
+books ||--o{ book_authors
+authors ||--o{ book_authors
+books ||--o{ loans
+readers ||--o{ loans
+note bottom of book_authors
+  One book has 1..N authors in the application.
+  Composite PK resolves the M:N relationship.
+end note
+@enduml

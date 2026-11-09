@@ -1,0 +1,102 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classBackgroundColor #F2F7FC
+skinparam classBorderColor #284B63
+hide empty members
+title Library Management - main classes (simplified)
+
+package Model {
+  abstract class Person {
+    - id : long
+    - fullName : String
+    - email : String
+    + getRole() : String
+  }
+  class Reader {
+    - membershipType : MembershipType
+    + getRole() : String
+  }
+  class Book {
+    - isbn : String
+    - title : String
+    - totalCopies : int
+    + equals(Object) : boolean
+    + hashCode() : int
+  }
+  class Author <<record>>
+  class Category <<record>>
+  class Loan <<record>>
+  enum MembershipType {
+    STUDENT
+    GUEST
+  }
+  Person <|-- Reader
+  Book "*" o-- "1..*" Author
+  Book "*" o-- "1" Category
+  Reader --> MembershipType
+}
+
+package DAO {
+  interface "CrudDao<T>" as CrudDao {
+    + create(T) : T
+    + findById(long) : Optional<T>
+    + findAll() : List<T>
+    + update(T) : void
+    + delete(long) : void
+  }
+  interface BookDao
+  interface ReaderDao
+  interface LoanDao
+  class JdbcBookDao
+  class JdbcReaderDao
+  class JdbcLoanDao
+  class JdbcCatalogDao
+  class JdbcReportDao
+  CrudDao <|-- BookDao
+  CrudDao <|-- ReaderDao
+  BookDao <|.. JdbcBookDao
+  ReaderDao <|.. JdbcReaderDao
+  LoanDao <|.. JdbcLoanDao
+}
+
+package Service {
+  interface LendingPolicy {
+    + maxActiveLoans() : int
+    + loanDays() : int
+  }
+  class StudentLendingPolicy
+  class GuestLendingPolicy
+  class LoanService {
+    + issue(bookId, readerId) : long
+    + returnBook(loanId) : void
+  }
+  LendingPolicy <|.. StudentLendingPolicy
+  LendingPolicy <|.. GuestLendingPolicy
+  LoanService o-- LendingPolicy
+  LoanService --> ReaderDao
+  LoanService --> LoanDao
+}
+
+class Database {
+  + open() : Connection
+  + query(SqlWork) : T
+  + transaction(SqlWork) : T
+}
+class ConsoleMenu
+class ConsoleInput
+ConsoleMenu --> ConsoleInput
+ConsoleMenu --> BookDao
+ConsoleMenu --> ReaderDao
+ConsoleMenu --> LoanService
+ConsoleMenu --> LoanDao
+ConsoleMenu --> JdbcCatalogDao
+ConsoleMenu --> JdbcReportDao
+JdbcBookDao --> Database
+JdbcReaderDao --> Database
+JdbcLoanDao --> Database
+JdbcCatalogDao --> Database
+JdbcReportDao --> Database
+@enduml

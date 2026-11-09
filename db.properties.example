@@ -1,0 +1,4 @@
+# Local development only. Copy to db.properties; never commit the real file.
+db.url=jdbc:postgresql://localhost:5433/library_db
+db.user=library_app
+db.password=library_local_password
