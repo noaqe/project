@@ -1,0 +1,50 @@
+### Список задач
+GET http://localhost:8080/api/tasks/
+
+### Поиск
+GET http://localhost:8080/api/tasks/?search=JOIN
+
+### Отчёт
+GET http://localhost:8080/api/reports/projects/
+
+### Создать проект — запомните ID
+POST http://localhost:8080/api/projects/
+Content-Type: application/json
+
+{"name":"Проект для защиты","description":"Проверка CRUD"}
+
+### Замените 4 на ID созданного проекта
+GET http://localhost:8080/api/projects/4
+
+### Изменить проект
+PUT http://localhost:8080/api/projects/4
+Content-Type: application/json
+
+{"name":"Обновлённый проект","description":"Изменение работает"}
+
+### Создать задачу — замените projectId на свой
+POST http://localhost:8080/api/tasks/
+Content-Type: application/json
+
+{"title":"Подготовить защиту","description":"Показать API","projectId":4,"assigneeId":1,"statusId":1,"dueDate":"2027-01-10"}
+
+### Замените 6 на ID созданной задачи
+GET http://localhost:8080/api/tasks/6
+
+### Изменить задачу
+PUT http://localhost:8080/api/tasks/6
+Content-Type: application/json
+
+{"title":"Подготовить защиту","description":"Готово","projectId":4,"assigneeId":1,"statusId":3,"dueDate":"2027-01-10"}
+
+### Валидация — ожидается 400
+POST http://localhost:8080/api/tasks/
+Content-Type: application/json
+
+{"title":"","projectId":1,"assigneeId":1,"statusId":1}
+
+### Удалить задачу
+DELETE http://localhost:8080/api/tasks/6
+
+### Удалить пустой проект
+DELETE http://localhost:8080/api/projects/4

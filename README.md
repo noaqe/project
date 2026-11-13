@@ -1,169 +1,165 @@
-# Library Management / Библиотека
+# Task Tracker — учёт задач
 
-Курсовой проект по **OOP and Databases**: консольная система учёта библиотеки на **Java 17**, **PostgreSQL** и **JDBC**. Открывается как Maven-проект в IntelliJ IDEA Community. Приложение работает с реальной БД, данные сохраняются между запусками.
+Небольшой учебный REST backend: **Java 17 + Spring Boot 3.5 + PostgreSQL 17**.
+Без frontend, Lombok и Hibernate. SQL написан явно, доступ к БД — через Spring JDBC (JdbcTemplate).
 
-## Возможности
+**[Скачать ZIP](https://github.com/noaqe/project/archive/refs/heads/task-tracker.zip)** ·
+**[Короткий отчёт](docs/report.md)** · **[Защита в IntelliJ](docs/defense.md)** ·
+**[ER и class diagram](docs/diagrams.md)**
 
-- Полный CRUD книг и читателей: создание, список, просмотр по ID, изменение, удаление.
-- У книги может быть несколько авторов; авторов и категории можно просматривать и добавлять из меню.
-- Поиск книг по названию, ISBN или автору через JOIN/подзапрос; поиск читателей по имени и email.
-- Выдача и возврат книг, вся история и список книг на руках.
-- Отчёты: популярность книг (`LEFT JOIN`, `COUNT`, `GROUP BY`), статистика категорий (агрегаты), просрочки (JOIN трёх таблиц).
-- Проверка ISBN-13 с контрольной цифрой, email, обязательных полей, диапазонов и существования связанных ID.
-- Транзакции, `PreparedStatement`, ограничения БД и блокировки строк при выдаче.
+Это отдельная ветка `task-tracker`. Библиотека осталась в `main`.
+В этой GitHub-версии находятся исходники и документация; готовый JAR собирается Docker или Maven.
 
-## Соответствие заданию
+## Запуск Docker
+
+Нужен Docker Desktop (Windows/macOS) или Docker Engine с Compose (Linux).
+Распакуйте ZIP, откройте терминал в папке с compose.yaml:
+
+```bash
+docker compose up --build -d
+```
+
+Первый запуск скачивает образы и зависимости, собирает JAR и создаёт БД.
+Откройте:
+
+- http://localhost:8080/api/tasks/ — пять стартовых задач в JSON;
+- http://localhost:8080/api/projects/ — три проекта;
+- http://localhost:8080/api/users/ — три исполнителя;
+- http://localhost:8080/api/statuses/ — три статуса;
+- http://localhost:8080/api/tasks/1/comments/ — комментарии;
+- http://localhost:8080/api/tasks/?search=JOIN — поиск;
+- http://localhost:8080/api/tasks/?projectId=1&statusId=3 — фильтры;
+- http://localhost:8080/api/reports/projects/ — отчёт JOIN + COUNT.
+
+Поддерживаются адреса с завершающим / и без него. Корень / не содержит веб-страницу.
+Логи: `docker compose logs -f app`. Остановка: `docker compose down`.
+Данные сохраняются в volume. `docker compose down -v` удаляет данные — только для полного сброса учебной БД.
+
+## IntelliJ IDEA
+
+1. Нужен JDK 17+. Откройте pom.xml как Maven-проект. Project SDK и Maven Runner JRE должны указывать на JDK.
+2. Запустите только PostgreSQL:
+   ```bash
+   docker compose -f compose.yaml -f compose.local.yaml up -d db
+   ```
+3. Если ранее запускали всё в Docker, освободите порт: `docker compose stop app`.
+4. Запустите `src/main/java/kg/alatoo/tasks/TaskTrackerApplication.java`.
+5. Откройте http://localhost:8080/api/tasks/.
+
+Настройки по умолчанию: localhost:5433, база tasks_db, пользователь tasks, пароль tasks_demo_password.
+Для своей БД задайте в Run Configuration переменные DB_URL, DB_USER, DB_PASSWORD.
+Пример для обычного PostgreSQL: DB_URL=jdbc:postgresql://localhost:5432/tasks_db.
+Базу и пользователя нужно создать заранее; таблицы создаёт Flyway.
+
+## Сборка без Docker
+
+Windows:
+```powershell
+.\mvnw.cmd clean package
+java -jar target/task-tracker.jar
+```
+
+Linux/macOS:
+```bash
+chmod +x mvnw
+./mvnw clean package
+java -jar target/task-tracker.jar
+```
+
+Для приложения необходима работающая PostgreSQL. В Docker сборка выполняется автоматически.
+
+## REST API
+
+| Метод | Адрес | Действие |
+|---|---|---|
+| GET | /api/tasks | Список; search, projectId, statusId |
+| GET | /api/tasks/{id} | Одна задача |
+| POST | /api/tasks | Создать |
+| PUT | /api/tasks/{id} | Заменить редактируемые поля |
+| DELETE | /api/tasks/{id} | Удалить задачу и комментарии |
+| GET | /api/projects | Все проекты |
+| GET | /api/projects/{id} | Один проект |
+| POST | /api/projects | Создать |
+| PUT | /api/projects/{id} | Изменить |
+| DELETE | /api/projects/{id} | Удалить пустой проект |
+| GET | /api/users, /api/statuses | Справочники |
+| GET | /api/tasks/{id}/comments | Комментарии |
+| GET | /api/reports/projects | Число всех и завершённых задач |
+
+POST возвращает 201 и Location, GET/PUT — 200, DELETE — 204 без тела.
+Неверный ввод — 400, отсутствующая запись — 404, удаление проекта с задачами — 409.
+Справочники и комментарии доступны для чтения.
+
+Пример JSON для POST /api/tasks:
+```json
+{
+  "title": "Подготовить защиту",
+  "description": "Объяснить контроллер, сервис и SQL",
+  "projectId": 1,
+  "assigneeId": 1,
+  "statusId": 1,
+  "dueDate": "2027-01-10"
+}
+```
+
+PUT использует такой же формат. title и три ID обязательны; description и dueDate — нет.
+При PUT пропущенное описание становится пустым, срок — null.
+Прошедшая дата разрешена, чтобы хранить просроченные задачи.
+POST/PUT/DELETE выполняйте через Postman, curl или [requests.http](requests.http).
+Адресная строка браузера делает GET.
+
+## БД и стартовые данные
+
+V1__schema.sql создаёт пять таблиц: app_users, projects, task_statuses, tasks, comments.
+V2__demo_data.sql добавляет 3 пользователей, 3 проекта, 3 статуса, 5 задач и 3 комментария.
+Flyway выполняет миграции один раз. Данные не дублируются при перезапуске.
+Техническая flyway_schema_history хранит историю миграций.
+Для действующей БД добавляйте V3, V4, а не редактируйте уже применённые файлы.
+
+```bash
+docker compose exec db psql -U tasks -d tasks_db -c "SELECT * FROM tasks;"
+```
+
+В DBeaver/pgAdmin подключайтесь через compose.local.yaml к localhost:5433.
+
+## Сервер
+
+Скопируйте проект на сервер с Docker Compose, создайте .env по .env.example и задайте свой пароль до первого запуска.
+Выполните `docker compose up --build -d`.
+Откройте http://SERVER_IP:8080/api/tasks/.
+APP_PORT меняет внешний порт приложения. Основной compose не публикует PostgreSQL наружу.
+Изменение пароля в .env не меняет пароль в уже созданном volume.
+
+API учебный, без авторизации: любой с сетевым доступом может менять записи.
+Для защиты ограничьте доступ к серверу доверенными пользователями; для публичного сервиса нужны авторизация и HTTPS.
+
+## Тесты на PostgreSQL
+
+Обычная сборка не запускает интеграционные тесты. Для них нужна отдельная локальная БД с суффиксом _test:
+
+```bash
+docker run -d --name task-tracker-test-db -e POSTGRES_DB=tasks_test -e POSTGRES_USER=tasks -e POSTGRES_PASSWORD=tasks_demo_password -p 127.0.0.1:15433:5432 postgres:17-alpine
+# Дождаться готовности:
+docker exec task-tracker-test-db pg_isready -U tasks -d tasks_test
+TEST_DB_URL=jdbc:postgresql://localhost:15433/tasks_test ./mvnw -Pintegration verify
+```
+
+PowerShell: сначала `$env:TEST_DB_URL="jdbc:postgresql://localhost:15433/tasks_test"`,
+затем `.\mvnw.cmd -Pintegration verify`.
+При других доступах задайте TEST_DB_USER и TEST_DB_PASSWORD.
+Изменения тестов откатываются; Flyway один раз создаёт тестовую схему и данные.
+Не используйте рабочую БД.
+
+## Требования курсовой
 
 | Требование | Реализация |
 |---|---|
-| 4–7 связанных таблиц | 6: `authors`, `categories`, `books`, `book_authors`, `readers`, `loans` |
-| Нормализация до 3NF | [Объяснение зависимостей](docs/database.md); M:N через `book_authors` |
-| Java-приложение с меню | `Main` → `ConsoleMenu` |
-| CRUD минимум двух сущностей | `BookDao`, `ReaderDao` и все операции в меню |
-| Поиск с JOIN | `JdbcBookDao.search()` |
-| Отчёт с агрегатом | `JdbcReportDao.popularBooks()` и `categoryStats()` |
-| Валидация | `Validation`, конструкторы моделей, `ConsoleInput`, ограничения SQL |
-| ER + class diagram | [ER](docs/er-diagram.png), [UML](docs/class-diagram.png); исходники PlantUML рядом |
-| ООП, DAO, слои | [Архитектура и объяснение ООП](docs/architecture.md) |
-| JUnit 5 | Модульные и интеграционные тесты с PostgreSQL |
+| 4–7 связанных таблиц, 3NF | 5 таблиц приложения; объяснение в отчёте |
+| CRUD двух сущностей | TaskController, ProjectController |
+| Поиск, JOIN | JdbcTaskRepository.findAll |
+| Отчёт, агрегаты | ReportRepository.byProject |
+| Валидация | DTO, @Valid, сервис, ограничения БД |
+| README, ER, class diagram | Этот файл и docs/diagrams.md |
 
-## Быстрый запуск в Windows / IntelliJ IDEA
-
-Нужны **JDK 17 или новее** и PostgreSQL 17/18 **либо Docker Desktop**. Java 8 для проекта не подходит. Maven отдельно устанавливать не обязательно: в репозитории есть Maven Wrapper.
-
-Исходный код: [github.com/noaqe/project](https://github.com/noaqe/project). Можно скачать ZIP через **Code → Download ZIP** либо выполнить `git clone https://github.com/noaqe/project.git`.
-
-1. Откройте папку проекта или `pom.xml` в IntelliJ IDEA: **File → Open**.
-2. В **File → Project Structure → Project SDK** выберите JDK 17+. Дождитесь загрузки Maven-зависимостей. Для Maven Runner тоже выберите этот JDK.
-3. В терминале из корня проекта скопируйте пример настроек:
-
-   ```powershell
-   Copy-Item db.properties.example db.properties
-   ```
-
-4. Запустите PostgreSQL одним из способов ниже.
-5. Соберите проект и создайте таблицы с демонстрационными данными:
-
-   ```powershell
-   .\mvnw.cmd clean package
-   java -jar target/library-management.jar --init --seed
-   java -jar target/library-management.jar
-   ```
-
-`--init` и `--seed` выполняют настройку и завершают работу. Для меню нужен отдельный запуск **без аргументов**. `--help` работает без подключения к БД.
-
-Если `java -version` показывает Java 8, задайте `JAVA_HOME` на установленный JDK 17+ и добавьте его `bin` в начало `PATH` текущего терминала либо запускайте `Main` из IntelliJ с правильным SDK. Сам файл `mvnw.cmd` тоже использует `JAVA_HOME`.
-
-В IntelliJ можно запускать класс `kg.alatoo.library.Main` зелёной кнопкой. **Working directory** должен указывать на корень проекта, где лежит `db.properties`. Для первого запуска укажите в **Program arguments** `--init --seed`, затем уберите аргументы.
-
-### Вариант A: PostgreSQL через Docker
-
-```powershell
-docker compose up -d --wait db
-```
-
-По умолчанию БД доступна только с этого компьютера на порту **5433**, база `library_db`, пользователь `library_app`. Демонстрационный локальный пароль совпадает с `db.properties.example`. Данные сохраняются в Docker volume `library_data`.
-
-Для своих значений скопируйте `.env.example` в `.env`, измените их и согласуйте с `db.properties`. Compose читает `.env`; Java читает `db.properties` или переменные `DB_*`. Остановка с сохранением данных: `docker compose down`. Изменение пароля в `.env` не меняет пароль уже созданного PostgreSQL volume.
-
-### Вариант B: уже установленный PostgreSQL
-
-В pgAdmin откройте Query Tool под администратором. Выполните **отдельными командами** (создание БД - вне транзакции):
-
-```sql
-CREATE USER library_app WITH PASSWORD 'library_local_password';
-```
-
-```sql
-CREATE DATABASE library_db OWNER library_app;
-```
-
-Укажите в локальном `db.properties` фактический порт (обычно `5432`):
-
-```properties
-db.url=jdbc:postgresql://localhost:5432/library_db
-db.user=library_app
-db.password=library_local_password
-```
-
-Затем выполните команды сборки и инициализации выше. Пароль в примере предназначен для локальной демонстрации. Для отдельного сервера задайте собственные доступы в локальном файле или окружении.
-
-### Linux / macOS
-
-```bash
-cp db.properties.example db.properties
-chmod +x mvnw
-docker compose up -d --wait db
-./mvnw clean package
-java -jar target/library-management.jar --init --seed
-java -jar target/library-management.jar
-```
-
-При проблемах с русским текстом используйте терминал UTF-8. В старой Windows-консоли перед запуском можно выполнить `chcp 65001`. В IntelliJ: **Settings → Editor → File Encodings → UTF-8**.
-
-## Настройка подключения
-
-Переменные `DB_URL`, `DB_USER`, `DB_PASSWORD` имеют приоритет над `db.properties`. Пример адреса: `jdbc:postgresql://localhost:5433/library_db`. Адрес HTTP API не является адресом PostgreSQL; для БД нужны отдельные порт, имя БД и пользователь.
-
-Файлы `db.properties` и `.env` исключены из Git. Доступы к чужим серверам не нужны для запуска этого проекта. `--init` создаёт схему `library` в выделенной БД, без `DROP`/`TRUNCATE`. Это начальная схема, а не система миграций.
-
-## Как пользоваться меню
-
-```text
-1. Книги  2. Читатели  3. Выдачи  4. Справочники  5. Отчёты  0. Выход
-```
-
-В разделах книг и читателей есть все CRUD-операции. Изменение запрашивает все новые значения, перед этим показывает текущую запись. Для удаления нужно набрать `YES`. Для добавления книги сначала посмотрите ID категории и авторов в справочниках; нескольких авторов вводите через запятую.
-
-Бизнес-правила:
-
-- **STUDENT**: до 5 активных выдач, срок 30 дней; **GUEST**: до 2, срок 14 дней.
-- Нельзя выдать книгу без свободного экземпляра, повторно выдать ту же книгу одному читателю или выдать новую при просрочке.
-- В день возврата по сроку книга ещё не считается просроченной.
-- Повторный возврат отклоняется. Нельзя уменьшить фонд ниже количества книг на руках.
-- Книги и читатели с историей выдач не удаляются: FK сохраняет историю даже после возврата. Для демонстрации удаления создайте новую запись без выдач.
-- Смена типа читателя влияет на новые выдачи; сроки уже созданных выдач сохраняются.
-- Доступность вычисляется как `total_copies - активные выдачи`, отдельного дублирующего счётчика в БД нет.
-
-`--seed` добавляет 4 книги, 4 авторов, 3 категории, 2 читателей и 3 примера выдач, включая просроченную. Повторный запуск не дублирует эти данные. Даты примеров рассчитываются относительно даты инициализации. Seed рассчитан на новую демонстрационную базу; для своей рабочей базы запускайте только `--init`.
-
-## Проверки
-
-Без БД:
-
-```powershell
-.\mvnw.cmd test
-```
-
-Интеграционные тесты проверяют CRUD, JOIN/M:N, откат транзакций, ограничения, отчёты, выдачу/возврат и параллельные запросы. Они сбрасывают **только схему `library` в отдельной локальной тестовой БД**. Для защиты от запуска по ошибке обязательны адрес `localhost`/`127.0.0.1`, имя БД с окончанием `_test` и явный `TEST_DB_RESET=true`. Параметры в тестовом JDBC URL не допускаются. Не используйте рабочую БД.
-
-Создайте БД `library_test` с владельцем `library_app`, затем:
-
-```powershell
-$env:TEST_DB_URL="jdbc:postgresql://localhost:5433/library_test"
-$env:TEST_DB_USER="library_app"
-$env:TEST_DB_PASSWORD="library_local_password"
-$env:TEST_DB_RESET="true"
-.\mvnw.cmd -Pintegration verify
-```
-
-GitHub Actions запускает эти проверки на Java 17 и отдельном PostgreSQL 17; отчёты Maven находятся в `target/surefire-reports` и `target/failsafe-reports`. Проверенные локальные результаты: [docs/verification.md](docs/verification.md).
-
-## Структура
-
-```text
-src/main/java/kg/alatoo/library/
-  model/       объекты предметной области
-  dao/         интерфейсы DAO и JDBC-реализации
-  service/     правила и стратегии выдачи
-  db/          подключения, транзакции, инициализация SQL
-  config/      настройки из окружения / локального файла
-  ui/          консольный ввод и меню
-  util/        валидация
-  exception/   понятные ошибки приложения
-src/main/resources/db/   схема и demo seed
-src/test/java/           JUnit 5
-docs/                    ER, UML, 3NF, архитектура, сценарий защиты
-```
-
-[Сценарий защиты и разбор вопросов](docs/defense-guide.md). [Сдача ссылки преподавателю](docs/submission.md).
+Если преподаватель требует именно консольное меню из методички, согласуйте замену меню на REST API:
+по заданию этот проект представляет собой backend с HTTP-маршрутами.

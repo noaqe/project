@@ -1,7 +1,5 @@
-/target/
-/.idea/
+target/
+.idea/
 *.iml
-/db.properties
-/.env
+.env
 *.log
-.DS_Store
